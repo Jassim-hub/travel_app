@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Inquiries - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Bot Performance Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h5><i class="fas fa-robot text-primary"></i> AI Bot Performance Dashboard</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Bot Status -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 bg-success text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-power-off fa-2x mb-2"></i>
+                                    <h4>ACTIVE</h4>
+                                    <small>Bot Status</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Response Categories -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 bg-info text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-tags fa-2x mb-2"></i>
+                                    <h4>4</h4>
+                                    <small>Response Categories</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Confidence Threshold -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 bg-warning text-dark">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                    <h4>60%</h4>
+                                    <small>Confidence Threshold</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Auto-Response Rate -->
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100 bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-percentage fa-2x mb-2"></i>
+                                    <h4>{{ "%.0f"|format(((bot_resolved|length) / ((bot_resolved|length) + (pending_inquiries|length)) * 100) if ((bot_resolved|length) + (pending_inquiries|length)) > 0 else 0) }}%</h4>
+                                    <small>Auto-Resolved</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bot Categories & Keywords -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6><i class="fas fa-cogs"></i> Bot Response Categories & Keywords</h6>
+                            <div class="row">
+                                <div class="col-md-3 mb-2">
+                                    <div class="border rounded p-2 bg-white">
+                                        <strong class="text-primary">📅 Booking</strong><br>
+                                        <small class="text-muted">book, booking, reserve, reservation, available, availability</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <div class="border rounded p-2 bg-white">
+                                        <strong class="text-success">💰 Pricing</strong><br>
+                                        <small class="text-muted">price, cost, fee, money, payment, cheap, expensive, discount</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <div class="border rounded p-2 bg-white">
+                                        <strong class="text-warning">🔄 Cancellation</strong><br>
+                                        <small class="text-muted">cancel, cancellation, refund, reschedule, change</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <div class="border rounded p-2 bg-white">
+                                        <strong class="text-info">ℹ️ General</strong><br>
+                                        <small class="text-muted">hello, hi, help, info, about, what, where, when</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Human Escalation Triggers -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6><i class="fas fa-exclamation-triangle text-danger"></i> Human Escalation Triggers</h6>
+                            <div class="bg-white border rounded p-2">
+                                <span class="badge bg-danger me-2">complaint</span>
+                                <span class="badge bg-danger me-2">problem</span>
+                                <span class="badge bg-danger me-2">issue</span>
+                                <span class="badge bg-danger me-2">angry</span>
+                                <span class="badge bg-danger me-2">disappointed</span>
+                                <span class="badge bg-danger me-2">terrible</span>
+                                <span class="badge bg-danger me-2">awful</span>
+                                <span class="badge bg-warning me-2">Low Confidence (&lt;60%)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-comments"></i> Pending Inquiries</h2>
+                <span class="badge bg-warning fs-6">{{ pending_inquiries|length }} Need Review</span>
+            </div>
+        </div>
+    </div>
+
+    {% if pending_inquiries %}
+    <div class="row">
+        {% for inquiry in pending_inquiries %}
+        <div class="col-lg-6 mb-4">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ inquiry.subject }}</h5>
+                        <small>{{ inquiry.created_at.strftime('%b %d, %Y at %I:%M %p') }}</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>From:</strong> {{ inquiry.name }} ({{ inquiry.email }})
+                        {% if inquiry.phone %}
+                        <br><strong>Phone:</strong> {{ inquiry.phone }}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Message:</strong>
+                        <div class="bg-light p-3 rounded mt-2">
+                            {{ inquiry.message }}
+                        </div>
+                    </div>
+                    
+                    {% if inquiry.bot_confidence %}
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            Bot Confidence: {{ "%.0f"|format(inquiry.bot_confidence * 100) }}%
+                            {% if inquiry.bot_confidence < 0.6 %}
+                            <span class="badge bg-danger">Low</span>
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Response Form -->
+                    <form method="POST" action="{{ url_for('main.respond_to_inquiry', inquiry_id=inquiry.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="mb-3">
+                            <label for="response_{{ inquiry.id }}" class="form-label"><strong>Your Response:</strong></label>
+                            <textarea class="form-control" id="response_{{ inquiry.id }}" name="response" rows="4" required placeholder="Type your personal response here..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send Response
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                    <h4 class="mt-3 text-success">All Caught Up!</h4>
+                    <p class="text-muted">No inquiries need human review at the moment. The AI bot is handling everything smoothly!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bot Performance Section -->
+    {% if bot_resolved %}
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-robot text-primary"></i> Recent Bot-Resolved Inquiries</h4>
+                <div>
+                    <span class="badge bg-success me-2">{{ bot_resolved|length }} Auto-Resolved</span>
+                    {% if bot_resolved and bot_resolved|selectattr('bot_confidence')|list %}
+                    <span class="badge bg-info">Avg Confidence: {{ "%.0f"|format((bot_resolved|selectattr('bot_confidence')|map(attribute='bot_confidence')|list|sum / bot_resolved|selectattr('bot_confidence')|list|length * 100) if bot_resolved|selectattr('bot_confidence')|list|length > 0 else 0) }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+            <p class="text-muted">These inquiries were automatically handled by our AI assistant:</p>
+        </div>
+    </div>
+    
+    <!-- Bot Performance Charts (Visual) -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-chart-pie"></i> Response Categories Distribution</h6>
+                </div>
+                <div class="card-body">
+                    {% set booking_count = 0 %}
+                    {% set pricing_count = 0 %}
+                    {% set general_count = 0 %}
+                    
+                    {% for inquiry in bot_resolved %}
+                        {% if inquiry.message and 'book' in inquiry.message.lower() %}
+                            {% set booking_count = booking_count + 1 %}
+                        {% elif inquiry.message and ('price' in inquiry.message.lower() or 'cost' in inquiry.message.lower()) %}
+                            {% set pricing_count = pricing_count + 1 %}
+                        {% else %}
+                            {% set general_count = general_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <div class="progress mb-2" style="height: 25px;">
+                        {% if booking_count > 0 %}
+                        <div class="progress-bar bg-primary" style="width: {{ (booking_count / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                            Booking ({{ booking_count }})
+                        </div>
+                        {% endif %}
+                        {% if pricing_count > 0 %}
+                        <div class="progress-bar bg-success" style="width: {{ (pricing_count / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                            Pricing ({{ pricing_count }})
+                        </div>
+                        {% endif %}
+                        {% if general_count > 0 %}
+                        <div class="progress-bar bg-info" style="width: {{ (general_count / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                            General ({{ general_count }})
+                        </div>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">Distribution of automatically resolved inquiry types</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-chart-bar"></i> Confidence Levels</h6>
+                </div>
+                <div class="card-body">
+                    {% set high_conf = 0 %}
+                    {% set med_conf = 0 %}
+                    {% set low_conf = 0 %}
+                    
+                    {% for inquiry in bot_resolved %}
+                        {% if inquiry.bot_confidence %}
+                            {% if inquiry.bot_confidence >= 0.8 %}
+                                {% set high_conf = high_conf + 1 %}
+                            {% elif inquiry.bot_confidence >= 0.6 %}
+                                {% set med_conf = med_conf + 1 %}
+                            {% else %}
+                                {% set low_conf = low_conf + 1 %}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <div class="mb-2">
+                        <small class="text-muted">High Confidence (80%+)</small>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-success" style="width: {{ (high_conf / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                                {{ high_conf }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">Medium Confidence (60-79%)</small>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-warning" style="width: {{ (med_conf / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                                {{ med_conf }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">Low Confidence (&lt;60%)</small>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-danger" style="width: {{ (low_conf / bot_resolved|length * 100) if bot_resolved|length > 0 else 0 }}%">
+                                {{ low_conf }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        {% for inquiry in bot_resolved %}
+        <div class="col-lg-4 mb-3">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <small>{{ inquiry.subject }}</small>
+                </div>
+                <div class="card-body py-2">
+                    <small>
+                        <strong>From:</strong> {{ inquiry.name }}<br>
+                        <strong>Resolved:</strong> {{ inquiry.created_at.strftime('%b %d, %Y') }}<br>
+                        {% if inquiry.bot_confidence %}
+                        <strong>Confidence:</strong> {{ "%.0f"|format(inquiry.bot_confidence * 100) }}%
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Bot Configuration Summary -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-cog"></i> Bot Configuration Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-sliders-h"></i> Current Settings</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Confidence Threshold:</strong></td>
+                                    <td><span class="badge bg-warning">60%</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Response Type:</strong></td>
+                                    <td><span class="badge bg-info">Keyword-Based</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Auto-Response:</strong></td>
+                                    <td><span class="badge bg-success">Enabled</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Human Escalation:</strong></td>
+                                    <td><span class="badge bg-primary">Enabled</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email Notifications:</strong></td>
+                                    <td><span class="badge bg-success">Active</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-chart-line"></i> Performance Stats (Last 30 Days)</h6>
+                            <div class="row text-center">
+                                <div class="col-6 mb-3">
+                                    <div class="bg-light p-3 rounded">
+                                        <h4 class="text-primary">{{ bot_resolved|length + pending_inquiries|length }}</h4>
+                                        <small>Total Inquiries</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="bg-light p-3 rounded">
+                                        <h4 class="text-success">{{ bot_resolved|length }}</h4>
+                                        <small>Auto-Resolved</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="bg-light p-3 rounded">
+                                        <h4 class="text-warning">{{ pending_inquiries|length }}</h4>
+                                        <small>Need Human Review</small>
+                                    </div>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <div class="bg-light p-3 rounded">
+                                        <h4 class="text-info">{{ "%.1f"|format(((bot_resolved|selectattr('bot_confidence')|map(attribute='bot_confidence')|list|sum / bot_resolved|selectattr('bot_confidence')|list|length) if bot_resolved|selectattr('bot_confidence')|list|length > 0 else 0) * 100) }}%</h4>
+                                        <small>Avg Confidence</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bot Health Status -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6><i class="fas fa-heartbeat"></i> System Health</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-circle text-success me-2"></i>
+                                        <span>Bot Service: <strong>Online</strong></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-circle text-success me-2"></i>
+                                        <span>Email Service: <strong>Active</strong></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-circle text-success me-2"></i>
+                                        <span>Database: <strong>Connected</strong></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-circle {{ 'text-success' if ((bot_resolved|length / (bot_resolved|length + pending_inquiries|length) * 100) if (bot_resolved|length + pending_inquiries|length) > 0 else 0) > 70 else 'text-warning' if ((bot_resolved|length / (bot_resolved|length + pending_inquiries|length) * 100) if (bot_resolved|length + pending_inquiries|length) > 0 else 0) > 50 else 'text-danger' }} me-2"></i>
+                                        <span>Performance: <strong>{{ 'Excellent' if ((bot_resolved|length / (bot_resolved|length + pending_inquiries|length) * 100) if (bot_resolved|length + pending_inquiries|length) > 0 else 0) > 70 else 'Good' if ((bot_resolved|length / (bot_resolved|length + pending_inquiries|length) * 100) if (bot_resolved|length + pending_inquiries|length) > 0 else 0) > 50 else 'Needs Attention' }}</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+}
+.bg-warning {
+    background-color: #fff3cd !important;
+}
+.border-warning {
+    border-color: #ffc107 !important;
+}
+.border-success {
+    border-color: #198754 !important;
+}
+</style>
+{% endblock %}

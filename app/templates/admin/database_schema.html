@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Database Schema - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-database text-primary"></i> Database Schema Visualization</h2>
+                <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+            <p class="text-muted">Visual representation of your travel app database structure and relationships</p>
+        </div>
+    </div>
+
+    <!-- Database Overview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> Database Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="bg-primary text-white p-3 rounded">
+                                <h4>{{ schema_info|length }}</h4>
+                                <small>Total Tables</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-success text-white p-3 rounded">
+                                <h4>{{ schema_info.values()|map(attribute='columns')|map('length')|sum }}</h4>
+                                <small>Total Columns</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-info text-white p-3 rounded">
+                                <h4>{{ schema_info.values()|map(attribute='foreign_keys')|map('length')|sum }}</h4>
+                                <small>Foreign Keys</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-warning text-dark p-3 rounded">
+                                <h4>SQLite</h4>
+                                <small>Database Type</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Schemas -->
+    <div class="row">
+        {% for table_name, table_info in schema_info.items() %}
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card h-100 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-table"></i> {{ table_name|title }}
+                        <span class="badge bg-light text-dark ms-2">{{ table_info.columns|length }} columns</span>
+                    </h6>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Columns -->
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 30%">Column</th>
+                                    <th style="width: 25%">Type</th>
+                                    <th style="width: 45%">Constraints</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for column in table_info.columns %}
+                                <tr>
+                                    <td>
+                                        <code class="text-primary">{{ column[1] }}</code>
+                                        {% if column[5] == 1 %}
+                                        <i class="fas fa-key text-warning ms-1" title="Primary Key"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ column[2] }}</span>
+                                    </td>
+                                    <td>
+                                        {% if column[3] == 1 %}
+                                        <span class="badge bg-danger me-1">NOT NULL</span>
+                                        {% endif %}
+                                        {% if column[4] %}
+                                        <span class="badge bg-info me-1">DEFAULT</span>
+                                        {% endif %}
+                                        {% if column[5] == 1 %}
+                                        <span class="badge bg-warning me-1">PK</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Foreign Keys -->
+                    {% if table_info.foreign_keys %}
+                    <div class="border-top bg-light p-2">
+                        <h6 class="mb-2"><i class="fas fa-link text-success"></i> Foreign Keys</h6>
+                        {% for fk in table_info.foreign_keys %}
+                        <div class="mb-1">
+                            <code class="text-primary">{{ fk[3] }}</code> 
+                            <i class="fas fa-arrow-right mx-1"></i> 
+                            <code class="text-success">{{ fk[2] }}.{{ fk[4] }}</code>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Relationships Diagram -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-project-diagram"></i> Table Relationships</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Core Entities -->
+                        <div class="col-md-6">
+                            <h6>Core Business Entities</h6>
+                            <div class="mb-3">
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex flex-column">
+                                        <div class="mb-2">
+                                            <span class="badge bg-primary">user</span> ↔ 
+                                            <span class="badge bg-success">booking</span>
+                                            <br><small class="text-muted">Users make bookings</small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="badge bg-primary">tour</span> ↔ 
+                                            <span class="badge bg-success">booking</span>
+                                            <br><small class="text-muted">Tours have bookings</small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="badge bg-primary">user</span> ↔ 
+                                            <span class="badge bg-info">review</span>
+                                            <br><small class="text-muted">Users write reviews</small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="badge bg-primary">tour</span> ↔ 
+                                            <span class="badge bg-info">review</span>
+                                            <br><small class="text-muted">Tours have reviews</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Support Systems -->
+                        <div class="col-md-6">
+                            <h6>Support & Bot System</h6>
+                            <div class="mb-3">
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex flex-column">
+                                        <div class="mb-2">
+                                            <span class="badge bg-warning">inquiry</span> ↔ 
+                                            <span class="badge bg-primary">user</span>
+                                            <br><small class="text-muted">Inquiries from users</small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="badge bg-warning">inquiry</span> ↔ 
+                                            <span class="badge bg-secondary">inquiry_response</span>
+                                            <br><small class="text-muted">Inquiry responses</small>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="badge bg-danger">🤖 Bot Fields</span>
+                                            <br><small class="text-muted">bot_processed, bot_confidence, bot_response_sent, requires_human_review</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Legend</h6>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div><i class="fas fa-key text-warning"></i> Primary Key</div>
+                                <div><i class="fas fa-link text-success"></i> Foreign Key</div>
+                                <div><span class="badge bg-danger">NOT NULL</span> Required Field</div>
+                                <div><span class="badge bg-info">DEFAULT</span> Has Default Value</div>
+                                <div><span class="badge bg-warning">PK</span> Primary Key</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bot-Related Tables -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="fas fa-robot"></i> Bot System Schema Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Inquiry Table Bot Fields</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><code>bot_processed</code></td>
+                                    <td><span class="badge bg-info">BOOLEAN</span></td>
+                                    <td>Has bot analyzed this inquiry?</td>
+                                </tr>
+                                <tr>
+                                    <td><code>bot_confidence</code></td>
+                                    <td><span class="badge bg-info">REAL</span></td>
+                                    <td>Bot confidence score (0.0-1.0)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>bot_response_sent</code></td>
+                                    <td><span class="badge bg-info">BOOLEAN</span></td>
+                                    <td>Has bot sent auto-response?</td>
+                                </tr>
+                                <tr>
+                                    <td><code>requires_human_review</code></td>
+                                    <td><span class="badge bg-info">BOOLEAN</span></td>
+                                    <td>Needs human attention?</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Bot Workflow</h6>
+                            <div class="border rounded p-3">
+                                <div class="text-center">
+                                    <div class="mb-2">📝 <strong>New Inquiry</strong></div>
+                                    <div class="mb-2">↓</div>
+                                    <div class="mb-2">🤖 <strong>Bot Analysis</strong><br><small>(bot_processed = true)</small></div>
+                                    <div class="mb-2">↓</div>
+                                    <div class="mb-2">📊 <strong>Confidence Check</strong><br><small>(bot_confidence ≥ 0.6?)</small></div>
+                                    <div class="mb-2">↓</div>
+                                    <div class="d-flex justify-content-between">
+                                        <div class="text-success">✅ <strong>Auto-Response</strong><br><small>(bot_response_sent = true)</small></div>
+                                        <div class="text-warning">👨‍💼 <strong>Human Review</strong><br><small>(requires_human_review = true)</small></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+}
+code {
+    font-size: 0.85em;
+}
+.table th {
+    font-size: 0.8em;
+    font-weight: 600;
+}
+.table td {
+    font-size: 0.85em;
+}
+.border-primary {
+    border-color: #0d6efd !important;
+}
+.border-success {
+    border-color: #198754 !important;
+}
+</style>
+{% endblock %}

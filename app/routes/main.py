@@ -16,7 +16,6 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from app.models import Tour, Category, Booking, Review, BookingStatus, Inquiry, InquiryResponse, User
 from app.forms import ContactForm, TourSearchForm
-from app.utils import send_inquiry_notification_email
 from flask_mail import Message
 from app import mail
 from app.reporting import (
@@ -143,12 +142,6 @@ def contact():
         db.session.add(inquiry)
         db.session.commit()
         
-        # Send notification email to admin
-        try:
-            send_inquiry_notification_email(inquiry)
-        except Exception as e:
-            current_app.logger.error(f"Failed to send inquiry notification: {e}")
-        
         flash('Thank you for your message! We have received your inquiry and will get back to you soon.', 'success')
         return redirect(url_for('main.contact'))
 
@@ -159,7 +152,7 @@ def contact():
 def send_message():
     """
     Handle contact form submission from homepage.
-    Processes the message and sends notifications.
+    Now includes AI bot processing.
     """
     try:
         # Get form data
@@ -184,43 +177,72 @@ def send_message():
                 phone=phone,
                 subject=subject,
                 message=message,
-                inquiry_type='general',  # Default to general inquiry
+                inquiry_type='general',
                 status='new',
-                priority='medium',
                 user_id=current_user.id if current_user.is_authenticated else None
             )
             db.session.add(inquiry)
             db.session.commit()
             current_app.logger.info(f"Inquiry saved successfully for {email}")
+            
+            # Send confirmation email
+            from app.utils import send_inquiry_confirmation_email
+            try:
+                send_inquiry_confirmation_email(inquiry)
+            except Exception as email_error:
+                current_app.logger.warning(f"Failed to send confirmation email: {str(email_error)}")
+            
+            # Process with AI bot (only if bot fields exist)
+            try:
+                from app.bot_service import inquiry_bot
+                bot_result = inquiry_bot.process_inquiry(inquiry)
+                
+                # Update inquiry with bot processing results (check if columns exist)
+                if hasattr(inquiry, 'bot_processed'):
+                    inquiry.bot_processed = True
+                    inquiry.bot_confidence = bot_result['analysis']['confidence']
+                    
+                    if bot_result['can_handle'] and bot_result['response']:
+                        # Bot can handle - send response
+                        from app.utils import send_bot_response_email
+                        try:
+                            send_bot_response_email(inquiry, bot_result['response'])
+                            if hasattr(inquiry, 'bot_response_sent'):
+                                inquiry.bot_response_sent = True
+                            inquiry.status = 'resolved'
+                            current_app.logger.info(f"Bot resolved inquiry {inquiry.id}")
+                        except Exception as email_error:
+                            current_app.logger.warning(f"Failed to send bot response: {str(email_error)}")
+                    else:
+                        # Escalate to human
+                        if hasattr(inquiry, 'requires_human_review'):
+                            inquiry.requires_human_review = True
+                        inquiry.status = 'pending_review'
+                        from app.utils import send_human_review_notification
+                        try:
+                            send_human_review_notification(inquiry)
+                        except Exception as email_error:
+                            current_app.logger.warning(f"Failed to send admin notification: {str(email_error)}")
+                        current_app.logger.info(f"Inquiry {inquiry.id} escalated for human review")
+                else:
+                    current_app.logger.info("Bot fields not available, skipping bot processing")
+                    
+            except Exception as bot_error:
+                current_app.logger.warning(f"Bot processing failed: {str(bot_error)}")
+                # Continue without bot processing
+            
+            db.session.commit()
+            
+            flash(
+                f"Thank you {first_name}! Your message has been received. Check your email for our response!",
+                "success",
+            )
+            
         except Exception as db_error:
             db.session.rollback()
             current_app.logger.error(f"Database error saving inquiry: {str(db_error)}")
             flash("Sorry, there was an error saving your message. Please try again.", "error")
             return redirect(url_for("main.index"))
-
-        # Send notification email to admin
-        try:
-            send_inquiry_notification_email(
-                {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "email": email,
-                    "phone": phone,
-                    "subject": subject,
-                    "message": message,
-                }
-            )
-            flash(
-                f"Thank you {first_name}! Your message has been sent. We'll get back to you soon.",
-                "success",
-            )
-        except Exception as email_error:
-            current_app.logger.error(f"Failed to send inquiry notification: {str(email_error)}")
-            # Still show success message since the inquiry was saved
-            flash(
-                f"Thank you {first_name}! Your message has been received. We'll get back to you soon.",
-                "success",
-            )
 
     except Exception as e:
         current_app.logger.error(f"Unexpected error in send_message: {str(e)}")
@@ -514,3 +536,162 @@ def admin_dashboard():
         "admin/dashboard.html",
         stats=stats
     )
+
+
+@main_bp.route("/admin/database-schema")
+@login_required
+def database_schema():
+    """Admin view for database schema visualization."""
+    if not current_user.is_admin():
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("main.dashboard"))
+    
+    from app.models import User, Tour, Booking, Review, Category, Inquiry, InquiryResponse
+    import sqlite3
+    
+    try:
+        # Get table information from SQLite
+        conn = sqlite3.connect('instance/travel_app.db')
+        cursor = conn.cursor()
+        
+        # Get all table names
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        tables = cursor.fetchall()
+        
+        schema_info = {}
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = cursor.fetchall()
+            
+            # Get foreign key info
+            cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+            foreign_keys = cursor.fetchall()
+            
+            schema_info[table_name] = {
+                'columns': columns,
+                'foreign_keys': foreign_keys
+            }
+        
+        conn.close()
+        
+        return render_template(
+            "admin/database_schema.html",
+            schema_info=schema_info
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in database_schema: {str(e)}")
+        flash("Error loading database schema.", "error")
+        return redirect(url_for("main.admin_dashboard"))
+
+
+@main_bp.route("/admin/pending-inquiries")
+@login_required
+def pending_inquiries():
+    """Admin view for inquiries that need human review."""
+    if not current_user.is_admin():
+        flash("Access denied. Admin privileges required.", "danger")
+        return redirect(url_for("main.dashboard"))
+    
+    from app.models import Inquiry
+    
+    try:
+        # Get inquiries needing human review (with error handling for missing columns)
+        try:
+            # Look for inquiries that require human review OR are new/unprocessed
+            pending = Inquiry.query.filter(
+                (Inquiry.requires_human_review == True) | 
+                (Inquiry.status == 'new') |
+                (Inquiry.bot_processed == False)
+            ).all()
+        except Exception as e:
+            current_app.logger.warning(f"Error with bot column query: {str(e)}")
+            # Fallback if bot columns don't exist yet - show all new inquiries
+            pending = Inquiry.query.filter_by(status='new').all()
+        
+        # Get bot-resolved inquiries for reference
+        try:
+            bot_resolved = Inquiry.query.filter(
+                (Inquiry.bot_response_sent == True) & 
+                (Inquiry.requires_human_review == False)
+            ).limit(10).all()
+        except Exception as e:
+            current_app.logger.warning(f"Error with bot resolved query: {str(e)}")
+            # Fallback if bot columns don't exist yet
+            bot_resolved = []
+        
+        return render_template(
+            "admin/pending_inquiries.html",
+            pending_inquiries=pending,
+            bot_resolved=bot_resolved
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in pending_inquiries: {str(e)}")
+        flash("Error loading inquiries. Database may need updating.", "error")
+        return redirect(url_for("main.dashboard"))
+
+
+@main_bp.route("/admin/inquiry/<int:inquiry_id>/respond", methods=["POST"])
+@login_required
+def respond_to_inquiry(inquiry_id):
+    """Admin responds to a pending inquiry."""
+    if not current_user.is_admin():
+        flash("Access denied.", "danger")
+        return redirect(url_for("main.dashboard"))
+    
+    from app.models import Inquiry
+    
+    inquiry = Inquiry.query.get_or_404(inquiry_id)
+    response_text = request.form.get("response")
+    
+    if not response_text:
+        flash("Please provide a response.", "error")
+        return redirect(url_for("main.pending_inquiries"))
+    
+    # Send human response email
+    from app.utils import send_email
+    subject = f"Re: {inquiry.subject} - Personal Response from Affordable Escapes"
+    
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #0066ff;">Personal Response to Your Inquiry</h2>
+            
+            <p>Dear <strong>{inquiry.name}</strong>,</p>
+            
+            <p>Thank you for your inquiry. One of our team members has personally reviewed your message and here's our response:</p>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #0066ff;">
+                <div style="white-space: pre-line;">{response_text}</div>
+            </div>
+            
+            <p>If you have any additional questions, please don't hesitate to contact us!</p>
+            
+            <p>Best regards,<br>
+            <strong>The Affordable Escapes Team</strong><br>
+            Phone: +256 705 908 699<br>
+            Email: affordablescapes@gmail.com</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        send_email(subject, [inquiry.email], response_text, html_body)
+        
+        # Update inquiry status
+        inquiry.status = 'resolved'
+        inquiry.requires_human_review = False
+        db.session.commit()
+        
+        flash(f"Response sent to {inquiry.name}!", "success")
+        current_app.logger.info(f"Human response sent for inquiry {inquiry_id}")
+        
+    except Exception as e:
+        flash("Error sending response. Please try again.", "error")
+        current_app.logger.error(f"Failed to send human response: {str(e)}")
+    
+    return redirect(url_for("main.pending_inquiries"))

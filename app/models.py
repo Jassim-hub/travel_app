@@ -488,6 +488,12 @@ class Inquiry(db.Model):
     # Status and response
     status = db.Column(db.String(20), default="new")  # 'new', 'in_progress', 'resolved', 'closed'
     is_resolved = db.Column(db.Boolean, default=False)
+    
+    # Bot processing fields
+    bot_processed = db.Column(db.Boolean, default=False)
+    bot_confidence = db.Column(db.Float, nullable=True)
+    bot_response_sent = db.Column(db.Boolean, default=False)
+    requires_human_review = db.Column(db.Boolean, default=False)
     admin_response = db.Column(db.Text)
     internal_notes = db.Column(db.Text)  # Internal admin notes
     assigned_to_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Assigned admin

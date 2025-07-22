@@ -391,71 +391,167 @@ def send_booking_confirmation_email(booking):
     send_email(subject, [booking.user.email], text_body, html_body)
 
 
-def send_inquiry_notification_email(inquiry_data):
+def send_inquiry_confirmation_email(inquiry):
+    """Send confirmation email when inquiry is received."""
+    subject = "We've Received Your Inquiry - Affordable Escapes"
+    
+    text_body = f"""
+    Dear {inquiry.name},
+    
+    Thank you for contacting Affordable Escapes! We've received your inquiry and our team is already working on it.
+    
+    Your Inquiry Details:
+    - Subject: {inquiry.subject}
+    - Date: {inquiry.created_at.strftime('%B %d, %Y at %I:%M %p')}
+    
+    What happens next?
+    1. Our AI assistant will analyze your inquiry immediately
+    2. If it's a common question, you'll receive an instant response
+    3. For complex inquiries, our team will personally respond within 24 hours
+    
+    You can expect to hear from us very soon!
+    
+    Best regards,
+    The Affordable Escapes Team
+    Phone: +256 705 908 699
+    Email: affordablescapes@gmail.com
     """
-    Send inquiry notification email to admin.
-
-    Args:
-        inquiry_data (dict): Inquiry data dictionary
-    """
-
-
-    # Get admin users (by role)
-    from app.models import UserRole
-    admins = User.query.filter_by(role=UserRole.ADMIN).all()
-    admin_emails = [admin.email for admin in admins]
-
-    if not admin_emails:
-        current_app.logger.warning("No admin users found for inquiry notification")
-        # Fallback to configured admin email
-        admin_emails = [
-            current_app.config.get("MAIL_DEFAULT_SENDER", "admin@travelapp.com")
-        ]
-
-    subject = f"New Inquiry: {inquiry_data['subject']}"
-
+    
     html_body = f"""
     <html>
-    <body>
-        <h2>New Customer Inquiry</h2>
-        
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <h3>Inquiry Details</h3>
-            <p><strong>From:</strong> {inquiry_data['first_name']} {inquiry_data['last_name']}</p>
-            <p><strong>Email:</strong> {inquiry_data['email']}</p>
-            {f"<p><strong>Phone:</strong> {inquiry_data['phone']}</p>" if inquiry_data.get('phone') else ""}
-            <p><strong>Subject:</strong> {inquiry_data['subject']}</p>
-            <p><strong>Date:</strong> {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')}</p>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #0066ff;">Thank You for Contacting Us!</h2>
+            
+            <p>Dear <strong>{inquiry.name}</strong>,</p>
+            
+            <p>Thank you for contacting <strong>Affordable Escapes</strong>! We've received your inquiry and our team is already working on it.</p>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="color: #0066ff; margin-top: 0;">Your Inquiry Details</h3>
+                <p><strong>Subject:</strong> {inquiry.subject}</p>
+                <p><strong>Date:</strong> {inquiry.created_at.strftime('%B %d, %Y at %I:%M %p')}</p>
+            </div>
+            
+            <h3 style="color: #0066ff;">What happens next?</h3>
+            <ol>
+                <li>Our AI assistant will analyze your inquiry immediately</li>
+                <li>If it's a common question, you'll receive an instant response</li>
+                <li>For complex inquiries, our team will personally respond within 24 hours</li>
+            </ol>
+            
+            <p style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+                <strong>You can expect to hear from us very soon!</strong>
+            </p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <p><strong>Contact Information:</strong></p>
+                <p>📞 Phone: +256 705 908 699<br>
+                ✉️ Email: affordablescapes@gmail.com</p>
+            </div>
+            
+            <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong>The Affordable Escapes Team</strong>
+            </p>
         </div>
-        
-        <h3>Message</h3>
-        <div style="background-color: #ffffff; padding: 15px; border-left: 4px solid #007bff;">
-            <p>{inquiry_data['message']}</p>
-        </div>
-        
-        <p>Please respond to this inquiry as soon as possible.</p>
-        <p>Reply directly to: {inquiry_data['email']}</p>
     </body>
     </html>
     """
+    
+    try:
+        send_email(subject, [inquiry.email], text_body, html_body)
+        current_app.logger.info(f"Confirmation email sent to {inquiry.email}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to send confirmation email: {str(e)}")
 
+
+def send_bot_response_email(inquiry, bot_response):
+    """Send bot-generated response to user."""
+    subject = f"Re: {inquiry.subject} - Instant Response from Affordable Escapes"
+    
     text_body = f"""
-    New Customer Inquiry
+    Dear {inquiry.name},
     
-    From: {inquiry_data['first_name']} {inquiry_data['last_name']}
-    Email: {inquiry_data['email']}
-    {f"Phone: {inquiry_data['phone']}" if inquiry_data.get('phone') else ""}
-    Subject: {inquiry_data['subject']}
-    Date: {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')}
+    Great news! We have an instant answer to your inquiry:
     
-    Message:
-    {inquiry_data['message']}
+    {bot_response}
     
-    Please respond to this inquiry as soon as possible.
-    Reply directly to: {inquiry_data['email']}
+    If this doesn't fully answer your question or you need additional help, please don't hesitate to contact us:
+    
+    Phone: +256 705 908 699
+    Email: affordablescapes@gmail.com
+    WhatsApp: https://wa.me/256705908699
+    
+    We're here to make your travel dreams come true!
+    
+    Best regards,
+    The Affordable Escapes Team
     """
+    
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #0066ff;">Instant Response to Your Inquiry</h2>
+            
+            <p>Dear <strong>{inquiry.name}</strong>,</p>
+            
+            <p>Great news! We have an instant answer to your inquiry:</p>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #0066ff;">
+                <div style="white-space: pre-line;">{bot_response}</div>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                <p style="margin: 0;"><strong>Need More Help?</strong></p>
+                <p style="margin: 5px 0 0 0;">If this doesn't fully answer your question, our team is ready to assist you personally!</p>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <h3 style="color: #0066ff;">Contact Us</h3>
+                <p>📞 Phone: <a href="tel:+256705908699">+256 705 908 699</a><br>
+                ✉️ Email: <a href="mailto:affordablescapes@gmail.com">affordablescapes@gmail.com</a><br>
+                💬 WhatsApp: <a href="https://wa.me/256705908699">Chat with us instantly</a></p>
+            </div>
+            
+            <p style="margin-top: 30px;">
+                We're here to make your travel dreams come true!<br><br>
+                Best regards,<br>
+                <strong>The Affordable Escapes Team</strong>
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        send_email(subject, [inquiry.email], text_body, html_body)
+        current_app.logger.info(f"Bot response email sent to {inquiry.email}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to send bot response email: {str(e)}")
 
-    send_email(subject, admin_emails, text_body, html_body)
+
+def send_human_review_notification(inquiry):
+    """Send notification to admin that inquiry needs human review."""
+    subject = f"Human Review Needed: {inquiry.subject}"
+    admin_email = current_app.config.get('MAIL_DEFAULT_SENDER', 'affordablescapes@gmail.com')
+    
+    text_body = f"""
+    An inquiry requires human review:
+    
+    From: {inquiry.name} ({inquiry.email})
+    Subject: {inquiry.subject}
+    Message: {inquiry.message}
+    
+    Please review and respond personally.
+    """
+    
+    try:
+        send_email(subject, [admin_email], text_body)
+        current_app.logger.info(f"Human review notification sent for inquiry {inquiry.id}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to send human review notification: {str(e)}")
 
 
 def validate_and_format_phone(phone):

@@ -20,7 +20,7 @@ from app.forms import BookingForm, BookingUpdateForm, BookingCancelForm
 from app.decorators import active_user_required, check_booking_ownership, admin_required
 from datetime import datetime, date
 import secrets
-from app.utils import send_booking_confirmation_email, send_inquiry_notification_email
+from app.utils import send_booking_confirmation_email
 
 # Create bookings blueprint
 bookings_bp = Blueprint("bookings", __name__, url_prefix="/bookings")
